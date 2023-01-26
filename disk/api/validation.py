@@ -4,7 +4,7 @@ from .models import Content
 def validation_get_request(uuid):
     try:
         return Content.objects.get(pk=uuid)
-    except Content.DoesNotExist:
+    finally:
         return False
 
 
