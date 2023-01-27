@@ -7,20 +7,20 @@ from rest_framework.decorators import api_view
 from .serializers import ImportContentSerializer, ExportContentSerializer
 
 
-def folder_dfs(rez):
+def folder_dfs(res):
     folder_size = 0
 
-    for i in range(len(rez['children'])):
-        key = rez['children'][i]
+    for i in range(len(res['children'])):
+        key = res['children'][i]
         child = dict(ExportContentSerializer(Content.objects.get(pk=key)).data)
-        rez['children'][i] = child
+        res['children'][i] = child
         if child['type'] == 'FOLDER':
             folder_dfs(child)
         elif child['type'] == 'FILE':
             child['children'] = None
         folder_size += child['size']
 
-    rez['size'] = folder_size
+    res['size'] = folder_size
 
 
 @api_view(['GET'])
@@ -29,12 +29,12 @@ def get_content(request, uuid):
     if not content:
         return http_responses.get_404()
     content = ExportContentSerializer(content)
-    rez = dict(content.data)
-    if rez['type'] == 'FILE':
-        rez['children'] = None
-    elif rez['type'] == 'FOLDER':
-        folder_dfs(rez)
-    return http_responses.get_200(rez)
+    res = dict(content.data)
+    if res['type'] == 'FILE':
+        res['children'] = None
+    elif res['type'] == 'FOLDER':
+        folder_dfs(res)
+    return http_responses.get_200(res)
 
 
 @api_view(['POST'])
@@ -69,27 +69,26 @@ def import_content(request):
             if content_serializer.is_valid():
                 content_serializer.save()
                 return True
-            else:
-                return False
+            return False
 
-    def dfs(v):
-        if graph[v] in graph:
-            is_checked[v] = True
-            if get_item_by_id[graph[v]]['type'] == 'FOLDER':
-                if is_checked[graph[v]] or dfs(graph[v]):
-                    return add_item(v)
+    def dfs(from_id):
+        to_id = graph[from_id]
+        if to_id in graph:
+            is_checked[from_id] = True
+            if get_item_by_id[to_id]['type'] == 'FOLDER' and (is_checked[to_id] or dfs(to_id)):
+                return add_item(from_id)
             return False
         else:
-            if graph[v] is None:
-                is_checked[v] = True
-                return add_item(v)
+            if to_id is None:
+                is_checked[from_id] = True
+                return add_item(from_id)
             else:
                 try:
-                    content = Content.objects.get(pk=graph[v])
+                    content = Content.objects.get(pk=to_id)
                     content = ImportContentSerializer(content)
                     if content.data['type'] == 'FOLDER':
-                        is_checked[v] = True
-                        return add_item(v)
+                        is_checked[from_id] = True
+                        return add_item(from_id)
                     return False
                 except Content.DoesNotExist:
                     return False
